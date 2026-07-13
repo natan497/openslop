@@ -2,6 +2,7 @@ import { JSX } from "react";
 import { RenderElementProps, ReactEditor, useSlateStatic } from "slate-react";
 import { Node } from "slate";
 import type { CanvasContentElement, SceneElement } from "@/lib/canvas/types";
+import { isImageElement } from "@/lib/canvas/guards";
 import { isSceneElement } from "@/lib/canvas/scenes";
 import { ZERO_WIDTH_SPACE } from "@/lib/canvas/constants";
 import { ELEMENT_CONFIGS } from "@/lib/canvas/elementConfigs";
@@ -126,7 +127,7 @@ export function ElementContainer({
 						contentEditable={false}
 					>
 						<ElementStaleIndicator element={element} />
-						{element.type === "image" && (
+						{isImageElement(element) && (
 							<ElementUploadButton element={element} />
 						)}
 						<AnimateButton element={element} />

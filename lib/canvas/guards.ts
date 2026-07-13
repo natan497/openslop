@@ -11,3 +11,11 @@ export const isContentElement = (n: unknown): n is CanvasContentElement =>
 
 export const isForeground = (n: unknown): n is CanvasContentElement =>
 	isContentElement(n) && FOREGROUND_TYPES.has(n.type);
+
+// CanvasContentElement is one flat type, not a discriminated union, so
+// `element.type === "image"` alone doesn't narrow the whole object — this
+// predicate does.
+export const isImageElement = (
+	element: CanvasContentElement,
+): element is CanvasContentElement & { type: "image" } =>
+	element.type === "image";
