@@ -70,6 +70,7 @@ describe("GenerationQueue", () => {
 				error: null,
 				resultInputs: null,
 				connectorType: null,
+				uploaded: false,
 			});
 		});
 	});
@@ -326,6 +327,7 @@ describe("GenerationQueue", () => {
 				error: null,
 				resultInputs: null,
 				connectorType: null,
+				uploaded: false,
 			});
 		});
 
@@ -368,7 +370,7 @@ describe("GenerationQueue", () => {
 				durationSec: 0,
 			};
 			const inputs = { prompt: "p", attributes: {} };
-			generationQueue.commitResult("sm1", result, inputs, "image");
+			generationQueue.commitResult("sm1", result, inputs, "image", true);
 
 			const snap = generationQueue.getElementSnapshot("sm1");
 			expect(snap.status).toBe("idle");
@@ -378,6 +380,7 @@ describe("GenerationQueue", () => {
 			// Without this, pickThumbnailUrl skips the upload and the project card
 			// stays blank (no job ran to set connectorType).
 			expect(snap.connectorType).toBe("image");
+			expect(snap.uploaded).toBe(true);
 
 			generationQueue.discard("sm1");
 		});
@@ -390,6 +393,7 @@ describe("GenerationQueue", () => {
 				{ imageUrl: "https://example.com/upload.png", durationSec: 0 },
 				{ prompt: "", attributes: {} },
 				"image",
+				true,
 			);
 
 			const thumbnail = pickThumbnailUrl(
@@ -417,7 +421,7 @@ describe("GenerationQueue", () => {
 				imageUrl: "https://example.com/upload.png",
 				durationSec: 0,
 			};
-			generationQueue.commitResult("sm2", uploaded, inputs, "image");
+			generationQueue.commitResult("sm2", uploaded, inputs, "image", true);
 			expect(generationQueue.getElementSnapshot("sm2").result).toEqual(
 				uploaded,
 			);
@@ -443,6 +447,7 @@ describe("GenerationQueue", () => {
 					attributes: {},
 				},
 				"image",
+				true,
 			);
 			const snap = generationQueue.getElementSnapshot("sm3");
 			expect(snap.error).toBeNull();
@@ -457,7 +462,7 @@ describe("GenerationQueue", () => {
 				durationSec: 0,
 			};
 			const inputs = { prompt: "p", attributes: {} };
-			generationQueue.commitResult("sm4", uploaded, inputs, "image");
+			generationQueue.commitResult("sm4", uploaded, inputs, "image", true);
 			generationQueue.setError("sm4", "prompt changed");
 			expect(generationQueue.getElementSnapshot("sm4").result).toBeNull();
 
@@ -478,6 +483,7 @@ describe("GenerationQueue", () => {
 				{ imageUrl: "https://example.com/upload.png", durationSec: 0 },
 				{ prompt: "p", attributes: {} },
 				"image",
+				true,
 			);
 			expect(listener).toHaveBeenCalled();
 
@@ -503,7 +509,7 @@ describe("GenerationQueue", () => {
 				durationSec: 0,
 			};
 			generationQueue.cancel("sm6");
-			generationQueue.commitResult("sm6", uploaded, inputs, "image");
+			generationQueue.commitResult("sm6", uploaded, inputs, "image", true);
 			expect(generationQueue.getElementSnapshot("sm6").result).toEqual(
 				uploaded,
 			);
@@ -632,6 +638,7 @@ describe("GenerationQueue", () => {
 			error: null,
 			resultInputs: { prompt: "p", attributes: {} },
 			connectorType: "image" as const,
+			uploaded: false,
 		};
 
 		it("dumps every entry verbatim", async () => {
@@ -654,6 +661,7 @@ describe("GenerationQueue", () => {
 					error: "boom",
 					resultInputs: null,
 					connectorType: null,
+					uploaded: false,
 				},
 			});
 		});
@@ -667,6 +675,7 @@ describe("GenerationQueue", () => {
 			error: null,
 			resultInputs: { prompt: "p", attributes: {} },
 			connectorType: "image" as const,
+			uploaded: false,
 		};
 
 		it("populates entries from the constructor", () => {

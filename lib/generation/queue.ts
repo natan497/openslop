@@ -22,6 +22,7 @@ export type ElementSnapshot = {
 	error: string | null;
 	resultInputs: GenerationInputs | null;
 	connectorType: AssetConnectorType | null;
+	uploaded: boolean;
 };
 
 export function isStaleResult(
@@ -29,6 +30,10 @@ export function isStaleResult(
 	currentInputs: GenerationInputs,
 ): boolean {
 	if (isNil(snapshot.result)) return false;
+	// An uploaded result isn't a stand-in for some prompt/attributes combo, so
+	// unrelated input drift (aspect ratio, a tagged character's avatar) must
+	// not make it eligible for Generate All to silently replace.
+	if (snapshot.uploaded) return false;
 	return !isEqual(currentInputs, snapshot.resultInputs);
 }
 
@@ -48,6 +53,7 @@ const EMPTY_SNAPSHOT: ElementSnapshot = {
 	error: null,
 	resultInputs: null,
 	connectorType: null,
+	uploaded: false,
 };
 
 const isActive = (status: ElementSnapshot["status"]) =>
@@ -158,7 +164,7 @@ export class GenerationQueue {
 	}
 
 	private resetToIdle(id: string) {
-		const { result, error, resultInputs, connectorType } =
+		const { result, error, resultInputs, connectorType, uploaded } =
 			this.getElementSnapshot(id);
 		if (result || error) {
 			this.state.set(id, {
@@ -168,6 +174,7 @@ export class GenerationQueue {
 				error,
 				resultInputs,
 				connectorType,
+				uploaded,
 			});
 		} else {
 			this.state.delete(id);
@@ -231,12 +238,13 @@ export class GenerationQueue {
 		this.notify();
 	}
 
-	// Cancel() any in-flight job first (or it can clobber this), and pass connectorType.
+	// Cancel() any in-flight job first (or it can clobber this), and pass connectorType and uploaded.
 	commitResult(
 		elementId: string,
 		result: AssetResult,
 		inputs: GenerationInputs,
 		connectorType: AssetConnectorType,
+		uploaded: boolean,
 	): void {
 		const key = serializeInputs(inputs);
 		const elHistory =
@@ -250,6 +258,7 @@ export class GenerationQueue {
 			error: null,
 			resultInputs: inputs,
 			connectorType,
+			uploaded,
 		});
 		this.notify();
 	}
@@ -317,7 +326,7 @@ export class GenerationQueue {
 		controller: AbortController,
 	) {
 		if (controller.signal.aborted) return;
-		this.commitResult(job.elementId, result, inputs, job.connectorType);
+		this.commitResult(job.elementId, result, inputs, job.connectorType, false);
 	}
 
 	private handleJobError(

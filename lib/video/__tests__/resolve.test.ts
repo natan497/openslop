@@ -41,6 +41,7 @@ function makeSnapshot(
 		error: null,
 		resultInputs: null,
 		connectorType: null,
+		uploaded: false,
 		...overrides,
 	};
 }

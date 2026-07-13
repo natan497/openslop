@@ -285,6 +285,45 @@ describe("useGenerateAll", () => {
 		expect(jobs[0].elementId).toBe("b");
 	});
 
+	it("excludes an uploaded image with a real prompt even when attributes drift", async () => {
+		// The motivating flow: image had a prompt, generated garbled text (#269),
+		// got an upload over it. Later something unrelated (aspect ratio, a
+		// tagged character's avatar) drifts the current attributes away from
+		// what was stored at upload time. Without the uploaded bit, isStaleResult
+		// would see the mismatch and Generate All would silently regenerate over
+		// the upload -- exactly what acceptance criterion #2 forbids.
+		getElementSnapshotSpy.mockImplementation((id: string) => ({
+			status: "idle",
+			seconds: 0,
+			result:
+				id === "a" ? { imageUrl: "https://example.com/upload.png" } : null,
+			error: null,
+			resultInputs:
+				id === "a"
+					? { prompt: "wizard sign", attributes: { emotion: "calm" } }
+					: null,
+			uploaded: id === "a",
+		}));
+
+		const { useGenerateAll } = await import("../hooks/useGenerateAll");
+		const children: Descendant[] = [
+			wrapInScene([
+				makeElement("a", "image", "wizard sign", { emotion: "happy" }),
+				makeElement("b", "narration", "hello"),
+			]),
+		];
+		const editor = { children } as unknown as Parameters<
+			typeof useGenerateAll
+		>[0];
+
+		const { generateAll } = useGenerateAll(editor);
+		generateAll();
+
+		const jobs: GenerationJob[] = enqueueAllSpy.mock.calls[0][0];
+		expect(jobs).toHaveLength(1);
+		expect(jobs[0].elementId).toBe("b");
+	});
+
 	it("skips elements with empty prompts", async () => {
 		const { useGenerateAll } = await import("../hooks/useGenerateAll");
 		const children: Descendant[] = [

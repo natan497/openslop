@@ -16,6 +16,7 @@ const snapshot = (
 	error: null,
 	resultInputs: null,
 	connectorType: null,
+	uploaded: false,
 	...overrides,
 });
 
@@ -64,6 +65,22 @@ describe("isStaleResult", () => {
 				inputs("hi", { gender: "feminine" }),
 			),
 		).toBe(true);
+	});
+
+	it("is false for an uploaded result even when attributes differ", () => {
+		// An uploaded image isn't a stand-in for any particular prompt/attributes
+		// combo, so unrelated drift (aspect ratio, a character's avatar) must not
+		// make Generate All eligible to replace it.
+		expect(
+			isStaleResult(
+				snapshot({
+					result,
+					resultInputs: inputs("hi", { gender: "masculine" }),
+					uploaded: true,
+				}),
+				inputs("hi", { gender: "feminine" }),
+			),
+		).toBe(false);
 	});
 
 	it("treats attribute key sets as equal regardless of insertion order", () => {
