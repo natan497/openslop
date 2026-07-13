@@ -3,12 +3,26 @@ import { BLOB_BASE_URL } from "./lib/blob";
 
 // Must track the same blob URLs lib/blob.ts + lib/api/asset-bundle.ts read —
 // an unlisted hostname 404s in an optimized <Image> (e.g. ProjectsList).
-const blobHostnames = Array.from(
-	new Set(
+const blobPatterns = Array.from(
+	new Map(
 		[process.env.NEXT_PUBLIC_BLOB_URL, BLOB_BASE_URL]
 			.filter((url): url is string => Boolean(url))
-			.map((url) => new URL(url).hostname),
-	),
+			.map((url) => {
+				const parsed = URL.parse(url);
+				if (!parsed) {
+					throw new Error(
+						`Invalid blob URL (check NEXT_PUBLIC_BLOB_URL): ${url}`,
+					);
+				}
+				return [
+					parsed.hostname,
+					{
+						protocol: parsed.protocol.slice(0, -1) as "http" | "https",
+						hostname: parsed.hostname,
+					},
+				] as const;
+			}),
+	).values(),
 );
 
 const SECURITY_HEADERS = [
@@ -23,13 +37,7 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
 	images: {
-		remotePatterns: [
-			...blobHostnames.map((hostname) => ({
-				protocol: "https" as const,
-				hostname,
-			})),
-			{ hostname: "picsum.photos" },
-		],
+		remotePatterns: [...blobPatterns, { hostname: "picsum.photos" }],
 	},
 	experimental: {
 		optimizePackageImports: [
