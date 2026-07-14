@@ -40,6 +40,7 @@ function makeSnapshot(
 		},
 		error: null,
 		resultInputs: null,
+		errorInputs: null,
 		connectorType: null,
 		uploaded: false,
 		...overrides,

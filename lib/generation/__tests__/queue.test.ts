@@ -3,7 +3,12 @@ import type { CanvasContentElement } from "@/lib/canvas/types";
 import type { ConnectorConfig } from "@/lib/connectors/types";
 import { pickThumbnailUrl } from "@/lib/project/thumbnail";
 import type { GenerationInputs } from "../generationInputs";
-import { GenerationQueue, type GenerationJob } from "../queue";
+import {
+	GenerationQueue,
+	errorForInputs,
+	isStaleResult,
+	type GenerationJob,
+} from "../queue";
 
 type GenerateFn = (...args: unknown[]) => Promise<unknown>;
 let generateMock: ReturnType<typeof vi.fn<GenerateFn>>;
@@ -69,6 +74,7 @@ describe("GenerationQueue", () => {
 				result: null,
 				error: null,
 				resultInputs: null,
+				errorInputs: null,
 				connectorType: null,
 				uploaded: false,
 			});
@@ -204,6 +210,48 @@ describe("GenerationQueue", () => {
 			expect(snap.status).toBe("idle");
 			expect(snap.result).toBeNull();
 			expect(snap.error).toBe("generation failed");
+		});
+
+		it("retires the error once the inputs it failed for are edited away", async () => {
+			const inputsA: GenerationInputs = { prompt: "A", attributes: {} };
+			const inputsB: GenerationInputs = { prompt: "B", attributes: {} };
+			const genA = { imageUrl: "https://example.com/a.png", durationSec: 0 };
+
+			generationQueue.commitResult("el", genA, inputsA, {
+				connectorType: "image",
+				uploaded: false,
+			});
+
+			generateMock.mockRejectedValue(new Error("boom"));
+			generationQueue.enqueue(makeJob("el", { inputs: inputsB }));
+			await vi.runAllTimersAsync();
+
+			const snap = generationQueue.getElementSnapshot("el");
+			// The failure belongs to B, and the result from A survived it.
+			expect(snap.result).toEqual(genA);
+			expect(errorForInputs(snap, inputsB)).toBe("boom");
+			// Reverting to A: the result is current again, so the error is retired.
+			expect(errorForInputs(snap, inputsA)).toBeNull();
+			expect(isStaleResult(snap, inputsA)).toBe(false);
+		});
+
+		it("keeps the error when the same inputs are retried and fail", async () => {
+			const inputsA: GenerationInputs = { prompt: "A", attributes: {} };
+
+			generationQueue.commitResult(
+				"el",
+				{ imageUrl: "https://example.com/a.png", durationSec: 0 },
+				inputsA,
+				{ connectorType: "image", uploaded: false },
+			);
+
+			generateMock.mockRejectedValue(new Error("boom"));
+			generationQueue.enqueue(makeJob("el", { inputs: inputsA }));
+			await vi.runAllTimersAsync();
+
+			const snap = generationQueue.getElementSnapshot("el");
+			expect(isStaleResult(snap, inputsA)).toBe(false);
+			expect(errorForInputs(snap, inputsA)).toBe("boom");
 		});
 
 		it("converts non-Error throws to string", async () => {
@@ -357,6 +405,7 @@ describe("GenerationQueue", () => {
 				result: null,
 				error: null,
 				resultInputs: null,
+				errorInputs: null,
 				connectorType: null,
 				uploaded: false,
 			});
@@ -697,6 +746,7 @@ describe("GenerationQueue", () => {
 			result: { url: "u", durationSec: 2 },
 			error: null,
 			resultInputs: { prompt: "p", attributes: {} },
+			errorInputs: null,
 			connectorType: "image" as const,
 			uploaded: false,
 		};
@@ -722,6 +772,7 @@ describe("GenerationQueue", () => {
 					result: null,
 					error: "boom",
 					resultInputs: null,
+					errorInputs: { prompt: "test prompt", attributes: {} },
 					connectorType: "image",
 					uploaded: false,
 				},
@@ -736,6 +787,7 @@ describe("GenerationQueue", () => {
 			result: { url: "u", durationSec: 2 },
 			error: null,
 			resultInputs: { prompt: "p", attributes: {} },
+			errorInputs: null,
 			connectorType: "image" as const,
 			uploaded: false,
 		};

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useConfig } from "@/lib/config/ConfigProvider";
-import { isStaleResult } from "@/lib/generation/queue";
+import { errorForInputs, isStaleResult } from "@/lib/generation/queue";
 import {
 	useGenerationQueue,
 	useQueueSelector,
@@ -40,7 +40,7 @@ export function useGenerate(element: CanvasContentElement) {
 		status: snapshot.status,
 		seconds: snapshot.seconds,
 		result: snapshot.result,
-		error: snapshot.error,
+		error: errorForInputs(snapshot, currentInputs),
 		stale,
 		hasPrompt: Boolean(currentInputs.prompt),
 		hasResult: Boolean(snapshot.result),

@@ -15,6 +15,7 @@ const snapshot = (
 	result: null,
 	error: null,
 	resultInputs: null,
+	errorInputs: null,
 	connectorType: null,
 	uploaded: false,
 	...overrides,

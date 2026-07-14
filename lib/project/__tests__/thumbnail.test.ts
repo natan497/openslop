@@ -24,6 +24,7 @@ const entry = (
 				: null,
 		error: null,
 		resultInputs: null,
+		errorInputs: null,
 		connectorType,
 		uploaded: false,
 	},

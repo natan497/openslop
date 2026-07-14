@@ -21,6 +21,7 @@ export type ElementSnapshot = {
 	result: AssetResult | null;
 	error: string | null;
 	resultInputs: GenerationInputs | null;
+	errorInputs: GenerationInputs | null;
 	connectorType: AssetConnectorType | null;
 	uploaded: boolean;
 };
@@ -31,6 +32,17 @@ export function isStaleResult(
 ): boolean {
 	if (isNil(snapshot.result)) return false;
 	return !isEqual(currentInputs, snapshot.resultInputs);
+}
+
+// An error describes the inputs it was thrown for, so editing away from those
+// inputs retires it — otherwise reverting a prompt leaves a failure sitting on
+// a result that is current and correct.
+export function errorForInputs(
+	snapshot: ElementSnapshot,
+	currentInputs: GenerationInputs,
+): string | null {
+	if (isNil(snapshot.error)) return null;
+	return isEqual(currentInputs, snapshot.errorInputs) ? snapshot.error : null;
 }
 
 export type GenerationJob = {
@@ -58,6 +70,7 @@ const EMPTY_SNAPSHOT: ElementSnapshot = {
 	result: null,
 	error: null,
 	resultInputs: null,
+	errorInputs: null,
 	connectorType: null,
 	uploaded: false,
 };
@@ -88,7 +101,13 @@ export class GenerationQueue {
 		for (const [id, snap] of Object.entries(initialState)) {
 			// error is transient job state like status/seconds — a failure from a
 			// past session shouldn't come back sitting on top of a good result.
-			this.state.set(id, { ...snap, status: "idle", seconds: 0, error: null });
+			this.state.set(id, {
+				...snap,
+				status: "idle",
+				seconds: 0,
+				error: null,
+				errorInputs: null,
+			});
 		}
 	}
 
@@ -172,18 +191,9 @@ export class GenerationQueue {
 	}
 
 	private resetToIdle(id: string) {
-		const { result, error, resultInputs, connectorType, uploaded } =
-			this.getElementSnapshot(id);
-		if (result || error) {
-			this.state.set(id, {
-				status: "idle",
-				seconds: 0,
-				result,
-				error,
-				resultInputs,
-				connectorType,
-				uploaded,
-			});
+		const snap = this.getElementSnapshot(id);
+		if (snap.result || snap.error) {
+			this.state.set(id, { ...snap, status: "idle", seconds: 0 });
 		} else {
 			this.state.delete(id);
 		}
@@ -203,6 +213,7 @@ export class GenerationQueue {
 				connectorType: job.connectorType,
 				// The previous attempt's error is stale the moment we retry.
 				error: null,
+				errorInputs: null,
 			});
 			this.pending.push(job);
 			added = true;
@@ -261,6 +272,7 @@ export class GenerationQueue {
 			result,
 			error: null,
 			resultInputs: inputs,
+			errorInputs: null,
 			...provenance,
 		});
 		this.notify();
@@ -274,6 +286,7 @@ export class GenerationQueue {
 			result: cached.result,
 			error: null,
 			resultInputs: inputs,
+			errorInputs: null,
 			connectorType: cached.connectorType,
 			uploaded: cached.uploaded,
 		});
@@ -315,7 +328,7 @@ export class GenerationQueue {
 		const inputs = getGenerationInputs(job.element, metadata);
 		generateForElement(job, inputs)
 			.then((result) => this.handleJobSuccess(job, inputs, result, controller))
-			.catch((err) => this.handleJobError(elementId, err, controller))
+			.catch((err) => this.handleJobError(elementId, err, inputs, controller))
 			.finally(() => this.finalizeJob(elementId, controller));
 	}
 
@@ -340,6 +353,7 @@ export class GenerationQueue {
 	private handleJobError(
 		elementId: string,
 		err: unknown,
+		inputs: GenerationInputs,
 		controller: AbortController,
 	) {
 		if (controller.signal.aborted) return;
@@ -350,6 +364,7 @@ export class GenerationQueue {
 			status: "idle",
 			seconds: 0,
 			error: errorMessage(err),
+			errorInputs: inputs,
 		});
 		this.notify();
 	}

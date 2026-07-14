@@ -18,7 +18,7 @@ import {
 	useQueueSelector,
 } from "@/lib/generation/GenerationQueueProvider";
 import { getGenerationInputs } from "@/lib/generation/getGenerationInputs";
-import { isStaleResult } from "@/lib/generation/queue";
+import { errorForInputs, isStaleResult } from "@/lib/generation/queue";
 import {
 	buildCharacterAvatarJob,
 	characterAvatarElement,
@@ -89,15 +89,15 @@ function CharacterEditDialogBody({
 		queue.enqueue(buildCharacterAvatarJob(projectId, name, connectorConfig));
 	};
 
+	const avatarInputs = getGenerationInputs(
+		characterAvatarElement(name, character.appearance),
+		metadata,
+	);
+
 	const isStale =
-		!character.avatarUploaded &&
-		isStaleResult(
-			avatarSnapshot,
-			getGenerationInputs(
-				characterAvatarElement(name, character.appearance),
-				metadata,
-			),
-		);
+		!character.avatarUploaded && isStaleResult(avatarSnapshot, avatarInputs);
+
+	const avatarError = errorForInputs(avatarSnapshot, avatarInputs);
 
 	const generating = avatarSnapshot.status !== "idle";
 	const hasAppearance = Boolean(character.appearance?.trim());
@@ -181,13 +181,13 @@ function CharacterEditDialogBody({
 								outputKind="image"
 								status={avatarSnapshot.status}
 								seconds={avatarSnapshot.seconds}
-								error={avatarSnapshot.error}
+								error={avatarError}
 							/>
 						) : (
 							<MediaPlaceholder
 								status={avatarSnapshot.status}
 								seconds={avatarSnapshot.seconds}
-								error={avatarSnapshot.error}
+								error={avatarError}
 								onDiscard={() => queue.discard(avatarElementId)}
 							/>
 						)}
