@@ -35,6 +35,22 @@ describe("errors stay visible when a result is present", () => {
 		expect(errorClass(html)).not.toContain("inset-0");
 	});
 
+	it("MediaPreview error is reachable without a mouse", () => {
+		const html = render(
+			<MediaPreview
+				url="https://example.com/up.png"
+				outputKind="image"
+				status="idle"
+				seconds={0}
+				error="provider exploded"
+			/>,
+		);
+		// Truncated text means the full message only lives in the tooltip, so the
+		// trigger must be focusable and announce as an error.
+		expect(html).toContain('role="alert"');
+		expect(html).toMatch(/<button[^>]*aria-label="Generation failed: provider/);
+	});
+
 	it("MediaPreview shows no error when there is none", () => {
 		const html = render(
 			<MediaPreview

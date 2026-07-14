@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { X as XIcon, AlertCircle, Check, Copy } from "@/components/ui/icon";
 import { SimpleTooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { GenerationIndicator } from "../GenerationIndicator";
 import type { GenerationState, PlaceholderProps } from "./status";
 
@@ -48,8 +48,32 @@ function CancelButton({
 	);
 }
 
+function useCopyMessage(message: string) {
+	const [copied, setCopied] = useState(false);
+	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	useEffect(
+		() => () => {
+			if (timerRef.current) clearTimeout(timerRef.current);
+		},
+		[],
+	);
+	const copy = async () => {
+		try {
+			await navigator.clipboard.writeText(message);
+		} catch (e) {
+			console.error("Failed to copy error message:", e);
+			return;
+		}
+		setCopied(true);
+		if (timerRef.current) clearTimeout(timerRef.current);
+		timerRef.current = setTimeout(() => setCopied(false), 1500);
+	};
+	return { copied, copy };
+}
+
 // Compact, so a transient failure can't hide or swallow clicks on a result
 // that's still perfectly usable — unlike the placeholder, something is under it.
+// The message is truncated, so the trigger has to be focusable to reach it.
 export function ErrorBadge({
 	message,
 	className,
@@ -57,19 +81,22 @@ export function ErrorBadge({
 	message: string;
 	className: string;
 }) {
+	const { copied, copy } = useCopyMessage(message);
 	return (
-		<SimpleTooltip label={message}>
-			<span
-				role="status"
-				className={cn(
-					"flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-md bg-destructive px-1.5 py-1 text-label text-destructive-foreground shadow-sm",
-					className,
-				)}
-			>
-				<AlertCircle className="h-3 w-3 shrink-0" />
-				<span className="truncate">{message}</span>
-			</span>
-		</SimpleTooltip>
+		<span role="alert" className={className}>
+			<SimpleTooltip label={copied ? "Copied" : message}>
+				<Badge asChild variant="destructive" className="max-w-full focus-ring">
+					<button
+						type="button"
+						onClick={copy}
+						aria-label={`Generation failed: ${message}. Copy error message`}
+					>
+						<AlertCircle />
+						<span className="min-w-0 truncate">{message}</span>
+					</button>
+				</Badge>
+			</SimpleTooltip>
+		</span>
 	);
 }
 
@@ -91,25 +118,7 @@ export function ResultOverlay({ status, seconds, error }: GenerationState) {
 }
 
 function ErrorMessage({ message }: { message: string }) {
-	const [copied, setCopied] = useState(false);
-	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	useEffect(
-		() => () => {
-			if (timerRef.current) clearTimeout(timerRef.current);
-		},
-		[],
-	);
-	const handleCopy = async () => {
-		try {
-			await navigator.clipboard.writeText(message);
-		} catch (e) {
-			console.error("Failed to copy error message:", e);
-			return;
-		}
-		setCopied(true);
-		if (timerRef.current) clearTimeout(timerRef.current);
-		timerRef.current = setTimeout(() => setCopied(false), 1500);
-	};
+	const { copied, copy: handleCopy } = useCopyMessage(message);
 	return (
 		<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-12 py-2">
 			<div className="pointer-events-auto flex max-h-full max-w-full items-start gap-1.5 overflow-auto rounded-lg bg-destructive px-3 py-1.5 shadow-md">
