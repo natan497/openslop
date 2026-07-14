@@ -128,16 +128,25 @@ function ErrorMessage({ message }: { message: string }) {
 	const { copied, copy: handleCopy } = useCopyMessage(message);
 	return (
 		<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-12 py-2">
-			<div className="pointer-events-auto flex max-h-full max-w-full items-start gap-1.5 overflow-auto rounded-lg bg-destructive px-3 py-1.5 shadow-md">
+			<div className="pointer-events-auto flex max-h-full max-w-full items-start gap-1.5 overflow-auto rounded-md bg-destructive px-3 py-1.5 shadow-elevation-3">
 				<AlertCircle className="mt-px h-3.5 w-3.5 shrink-0 text-destructive-foreground" />
-				<p className="min-w-0 whitespace-pre-wrap break-words text-label leading-snug text-destructive-foreground">
+				{/* The live region is the message, not the box: the box also holds the
+				    copy icon, whose swap would re-announce the whole error. */}
+				<p
+					role="alert"
+					className="min-w-0 whitespace-pre-wrap break-words text-label leading-snug text-destructive-foreground"
+				>
 					{message}
 				</p>
 				<button
 					type="button"
 					onClick={handleCopy}
-					aria-label={copied ? "Copied" : "Copy error message"}
-					className="mt-px shrink-0 rounded text-destructive-foreground transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border"
+					aria-label={
+						copied
+							? "Copied"
+							: `Generation failed: ${message}. Copy error message`
+					}
+					className="mt-px shrink-0 rounded-md text-destructive-foreground transition-colors focus-ring"
 				>
 					{copied ? (
 						<Check className="h-3.5 w-3.5" />

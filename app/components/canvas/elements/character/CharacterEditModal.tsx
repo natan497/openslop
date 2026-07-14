@@ -192,7 +192,7 @@ function CharacterEditDialogBody({
 							/>
 						)}
 						<UploadImageButton
-							className="absolute left-2 top-2 z-10 bg-card shadow-sm ring-1 ring-border"
+							className="absolute right-2 top-2 z-10 bg-card shadow-elevation-1 ring-1 ring-border"
 							onUpload={(url) => {
 								queue.discard(avatarElementId);
 								setCharacter(name, {

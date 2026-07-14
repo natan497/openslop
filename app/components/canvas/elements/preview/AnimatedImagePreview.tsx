@@ -42,7 +42,7 @@ export function AnimatedImagePreview({
 				/>
 			)}
 			<MediaToggle
-				className="absolute top-2 right-2 z-10 shadow-sm"
+				className="absolute top-2 right-2 z-10 shadow-elevation-1"
 				value={mode}
 				onChange={setMode}
 				options={[

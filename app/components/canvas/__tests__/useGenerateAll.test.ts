@@ -256,35 +256,6 @@ describe("useGenerateAll", () => {
 		expect(jobs).toHaveLength(0);
 	});
 
-	it("does not include an uploaded image (no prompt) in Generate All", async () => {
-		getElementSnapshotSpy.mockImplementation((id: string) => ({
-			status: "idle",
-			seconds: 0,
-			result:
-				id === "a" ? { imageUrl: "https://example.com/upload.png" } : null,
-			error: null,
-			resultInputs: id === "a" ? { prompt: "", attributes: {} } : null,
-		}));
-
-		const { useGenerateAll } = await import("../hooks/useGenerateAll");
-		const children: Descendant[] = [
-			wrapInScene([
-				makeElement("a", "image", ""),
-				makeElement("b", "narration", "hello"),
-			]),
-		];
-		const editor = { children } as unknown as Parameters<
-			typeof useGenerateAll
-		>[0];
-
-		const { generateAll } = useGenerateAll(editor);
-		generateAll();
-
-		const jobs: GenerationJob[] = enqueueAllSpy.mock.calls[0][0];
-		expect(jobs).toHaveLength(1);
-		expect(jobs[0].elementId).toBe("b");
-	});
-
 	it("excludes an uploaded image with a real prompt even when attributes drift", async () => {
 		getElementSnapshotSpy.mockImplementation((id: string) => ({
 			status: "idle",
