@@ -36,8 +36,7 @@ export function ElementUploadButton({
 					element.id,
 					{ imageUrl: url, durationSec: 0 },
 					getGenerationInputs(element, metadata),
-					"image",
-					true,
+					{ connectorType: "image", uploaded: true },
 				);
 			}}
 		/>
