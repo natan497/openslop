@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { X as XIcon, AlertCircle, Check, Copy } from "@/components/ui/icon";
 import { SimpleTooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { GenerationIndicator } from "../GenerationIndicator";
 import type { GenerationState, PlaceholderProps } from "./status";
 
@@ -79,17 +80,23 @@ export function ErrorBadge({
 	className,
 }: {
 	message: string;
-	className: string;
+	className?: string;
 }) {
 	const { copied, copy } = useCopyMessage(message);
 	return (
-		<span role="alert" className={className}>
+		// Constrained here, not at the call sites: this span is the flex item, so
+		// it's the one that has to shrink for the message to truncate.
+		<span role="alert" className={cn("min-w-0 max-w-full", className)}>
 			<SimpleTooltip label={copied ? "Copied" : message}>
 				<Badge asChild variant="destructive" className="max-w-full focus-ring">
 					<button
 						type="button"
 						onClick={copy}
-						aria-label={`Generation failed: ${message}. Copy error message`}
+						aria-label={
+							copied
+								? "Copied"
+								: `Generation failed: ${message}. Copy error message`
+						}
 					>
 						<AlertCircle />
 						<span className="min-w-0 truncate">{message}</span>

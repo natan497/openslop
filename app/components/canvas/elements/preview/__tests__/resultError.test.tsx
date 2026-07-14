@@ -19,6 +19,12 @@ const errorClass = (html: string) => {
 	return match[1];
 };
 
+const alertClass = (html: string) => {
+	const match = html.match(/role="alert" class="([^"]*)"/);
+	if (!match) throw new Error("alert wrapper not found in rendered markup");
+	return match[1];
+};
+
 describe("errors stay visible when a result is present", () => {
 	it("MediaPreview shows the error without covering the result", () => {
 		const html = render(
@@ -75,5 +81,18 @@ describe("errors stay visible when a result is present", () => {
 		);
 		expect(html).toContain("tts failed");
 		expect(errorClass(html)).not.toContain("inset-0");
+	});
+
+	it("AudioResult error can shrink, so a long message truncates", () => {
+		const html = render(
+			<AudioResult
+				src="https://example.com/a.mp3"
+				status="idle"
+				seconds={0}
+				error="the provider rejected this request for a reason it described at considerable length"
+			/>,
+		);
+		expect(alertClass(html)).toContain("min-w-0");
+		expect(alertClass(html)).not.toContain("shrink-0");
 	});
 });

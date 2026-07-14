@@ -28,7 +28,7 @@ export function AudioResult({
 				/>
 			)}
 			<AudioPlayer key={src} src={src} />
-			{error && <ErrorBadge message={error} className="shrink-0" />}
+			{error && <ErrorBadge message={error} />}
 		</div>
 	);
 }
