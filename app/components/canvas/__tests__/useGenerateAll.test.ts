@@ -256,6 +256,40 @@ describe("useGenerateAll", () => {
 		expect(jobs).toHaveLength(0);
 	});
 
+	// Animate rewrites the element's type in place, keeping its id, so the
+	// queue entry keeps an uploaded flag describing a still it can no longer use.
+	it("includes an animated image whose uploaded flag is left over from Animate", async () => {
+		getElementSnapshotSpy.mockImplementation((id: string) => ({
+			status: "idle",
+			seconds: 0,
+			result:
+				id === "a" ? { imageUrl: "https://example.com/upload.png" } : null,
+			error: null,
+			resultInputs:
+				id === "a" ? { prompt: "wizard sign", attributes: {} } : null,
+			uploaded: id === "a",
+		}));
+
+		const { useGenerateAll } = await import("../hooks/useGenerateAll");
+		const children: Descendant[] = [
+			wrapInScene([
+				makeElement("a", "animated_image", "wizard sign", {
+					videoPrompt: "slow pan",
+				}),
+			]),
+		];
+		const editor = { children } as unknown as Parameters<
+			typeof useGenerateAll
+		>[0];
+
+		const { generateAll } = useGenerateAll(editor);
+		generateAll();
+
+		const jobs: GenerationJob[] = enqueueAllSpy.mock.calls[0][0];
+		expect(jobs).toHaveLength(1);
+		expect(jobs[0].elementId).toBe("a");
+	});
+
 	it("excludes an uploaded image with a real prompt even when attributes drift", async () => {
 		getElementSnapshotSpy.mockImplementation((id: string) => ({
 			status: "idle",

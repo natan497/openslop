@@ -84,26 +84,33 @@ export function ErrorBadge({
 }) {
 	const { copied, copy } = useCopyMessage(message);
 	return (
-		// Constrained here, not at the call sites: this span is the flex item, so
-		// it's the one that has to shrink for the message to truncate.
-		<span role="alert" className={cn("min-w-0 max-w-full", className)}>
-			<SimpleTooltip label={copied ? "Copied" : message}>
-				<Badge asChild variant="destructive" className="max-w-full focus-ring">
-					<button
-						type="button"
-						onClick={copy}
-						aria-label={
-							copied
-								? "Copied"
-								: `Generation failed: ${message}. Copy error message`
-						}
+		<>
+			{/* Constrained here, not at the call sites: this span is the flex item,
+			    so it's the one that has to shrink for the message to truncate. */}
+			<span role="alert" className={cn("min-w-0 max-w-full", className)}>
+				<SimpleTooltip label={copied ? "Copied" : message}>
+					<Badge
+						asChild
+						variant="destructive"
+						className="max-w-full focus-ring"
 					>
-						<AlertCircle />
-						<span className="min-w-0 truncate">{message}</span>
-					</button>
-				</Badge>
-			</SimpleTooltip>
-		</span>
+						<button
+							type="button"
+							onClick={copy}
+							aria-label={`Generation failed: ${message}. Copy error message`}
+						>
+							<AlertCircle />
+							<span className="min-w-0 truncate">{message}</span>
+						</button>
+					</Badge>
+				</SimpleTooltip>
+			</span>
+			{/* Outside the alert: a polite confirmation, so the button keeps its
+			    name and copying doesn't re-announce the error assertively. */}
+			<span role="status" className="sr-only">
+				{copied ? "Copied" : ""}
+			</span>
+		</>
 	);
 }
 
@@ -141,11 +148,7 @@ function ErrorMessage({ message }: { message: string }) {
 				<button
 					type="button"
 					onClick={handleCopy}
-					aria-label={
-						copied
-							? "Copied"
-							: `Generation failed: ${message}. Copy error message`
-					}
+					aria-label={`Generation failed: ${message}. Copy error message`}
 					className="mt-px shrink-0 rounded-md text-destructive-foreground transition-colors focus-ring"
 				>
 					{copied ? (
@@ -154,6 +157,9 @@ function ErrorMessage({ message }: { message: string }) {
 						<Copy className="h-3.5 w-3.5" />
 					)}
 				</button>
+				<span role="status" className="sr-only">
+					{copied ? "Copied" : ""}
+				</span>
 			</div>
 		</div>
 	);

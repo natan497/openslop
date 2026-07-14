@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Editor } from "slate";
 import { useConfig } from "@/lib/config/ConfigProvider";
+import { isImageElement } from "@/lib/canvas/guards";
 import { getContentElements } from "@/lib/canvas/scenes";
 import { getGenerationInputs } from "@/lib/generation/getGenerationInputs";
 import { isStaleResult } from "@/lib/generation/queue";
@@ -19,9 +20,13 @@ export function useGenerateAll(editor: Editor) {
 			.filter((el) => {
 				const inputs = getGenerationInputs(el, metadata);
 				const snap = queue.getElementSnapshot(el.id);
+				// Only an image element can hold an upload, so on anything else the
+				// flag is a leftover from an in-place type change (image -> animated)
+				// and describes a result this element can no longer use.
+				const protectedUpload = snap.uploaded && isImageElement(el);
 				const shouldGenerate =
 					inputs.prompt &&
-					!snap.uploaded &&
+					!protectedUpload &&
 					(!snap.result || isStaleResult(snap, inputs));
 				return shouldGenerate;
 			})
