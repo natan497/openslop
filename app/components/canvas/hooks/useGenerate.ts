@@ -28,13 +28,9 @@ export function useGenerate(element: CanvasContentElement) {
 	}, [queue, element.id, currentInputs, stale]);
 
 	const generate = useCallback(() => {
-		if (!currentInputs.prompt) {
-			queue.setError(element.id, "Enter a prompt first");
-			return;
-		}
 		const job = buildGenerationJob(element, connectorConfig, projectId);
 		scheduleGeneration(queue, [job], { projectId, registry: connectorConfig });
-	}, [queue, element, currentInputs.prompt, connectorConfig, projectId]);
+	}, [queue, element, connectorConfig, projectId]);
 
 	const discard = useCallback(() => {
 		queue.discard(element.id);

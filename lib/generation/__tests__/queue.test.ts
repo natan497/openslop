@@ -225,27 +225,25 @@ describe("GenerationQueue", () => {
 
 			await vi.runAllTimersAsync();
 
-			// handleJobError owns the failure notify (finalizeJob no longer
-			// notifies), so the error must still reach subscribers.
 			expect(listener).toHaveBeenCalled();
 			expect(generationQueue.getElementSnapshot("err3").error).toBe("boom");
 		});
 
-		it("clears the uploaded flag when a regenerate over an upload fails", async () => {
+		it("keeps an uploaded result when a regenerate over it fails", async () => {
 			const inputs = { prompt: "p", attributes: {} };
-			generationQueue.commitResult(
-				"err4",
-				{ imageUrl: "https://example.com/up.png", durationSec: 0 },
-				inputs,
-				{ connectorType: "image", uploaded: true },
-			);
+			const upload = { imageUrl: "https://example.com/up.png", durationSec: 0 };
+			generationQueue.commitResult("err4", upload, inputs, {
+				connectorType: "image",
+				uploaded: true,
+			});
 			generateMock.mockRejectedValue(new Error("gen failed"));
 			generationQueue.enqueue(makeJob("err4", { inputs }));
 			await vi.runAllTimersAsync();
 
 			const snap = generationQueue.getElementSnapshot("err4");
-			expect(snap.result).toBeNull();
-			expect(snap.uploaded).toBe(false);
+			expect(snap.result).toEqual(upload);
+			expect(snap.uploaded).toBe(true);
+			expect(snap.error).toBe("gen failed");
 		});
 	});
 
@@ -369,35 +367,6 @@ describe("GenerationQueue", () => {
 		});
 	});
 
-	describe("setError", () => {
-		it("sets an error on an element", () => {
-			generationQueue.setError("se1", "something went wrong");
-			const snap = generationQueue.getElementSnapshot("se1");
-			expect(snap.error).toBe("something went wrong");
-			expect(snap.result).toBeNull();
-
-			generationQueue.discard("se1");
-		});
-
-		it("clears the uploaded flag when it nulls the result", () => {
-			// Upload, then a failed regenerate lands here — leaving uploaded true
-			// with no result would make Generate All skip the element forever.
-			generationQueue.commitResult(
-				"se2",
-				{ imageUrl: "https://example.com/up.png", durationSec: 0 },
-				{ prompt: "p", attributes: {} },
-				{ connectorType: "image", uploaded: true },
-			);
-			generationQueue.setError("se2", "regenerate failed");
-
-			const snap = generationQueue.getElementSnapshot("se2");
-			expect(snap.result).toBeNull();
-			expect(snap.uploaded).toBe(false);
-
-			generationQueue.discard("se2");
-		});
-	});
-
 	describe("commitResult", () => {
 		it("sets result, connectorType, clears error, and moves status to idle", () => {
 			const result = {
@@ -415,8 +384,6 @@ describe("GenerationQueue", () => {
 			expect(snap.result).toEqual(result);
 			expect(snap.error).toBeNull();
 			expect(snap.resultInputs).toEqual(inputs);
-			// Without this, pickThumbnailUrl skips the upload and the project card
-			// stays blank (no job ran to set connectorType).
 			expect(snap.connectorType).toBe("image");
 			expect(snap.uploaded).toBe(true);
 
@@ -424,8 +391,6 @@ describe("GenerationQueue", () => {
 		});
 
 		it("makes an uploaded-only image project's thumbnail resolve via pickThumbnailUrl", () => {
-			// The exact repro: new project, drop an image element, upload without
-			// ever hitting generate — pickThumbnailUrl must still find the image.
 			generationQueue.commitResult(
 				"scene-1",
 				{ imageUrl: "https://example.com/upload.png", durationSec: 0 },
@@ -469,8 +434,10 @@ describe("GenerationQueue", () => {
 			generationQueue.discard("sm2");
 		});
 
-		it("overwrites an existing error", () => {
-			generationQueue.setError("sm3", "something went wrong");
+		it("overwrites an existing error", async () => {
+			generateMock.mockRejectedValue(new Error("something went wrong"));
+			generationQueue.enqueue(makeJob("sm3"));
+			await vi.runAllTimersAsync();
 			expect(generationQueue.getElementSnapshot("sm3").error).toBe(
 				"something went wrong",
 			);
@@ -505,8 +472,12 @@ describe("GenerationQueue", () => {
 				connectorType: "image",
 				uploaded: true,
 			});
-			generationQueue.setError("sm4", "prompt changed");
-			expect(generationQueue.getElementSnapshot("sm4").result).toBeNull();
+			generationQueue.commitResult(
+				"sm4",
+				{ imageUrl: "https://example.com/other.png", durationSec: 0 },
+				{ prompt: "changed", attributes: {} },
+				{ connectorType: "image", uploaded: true },
+			);
 
 			const restored = generationQueue.restoreResult("sm4", inputs);
 			expect(restored).toBe(true);
@@ -544,7 +515,6 @@ describe("GenerationQueue", () => {
 				"generating",
 			);
 
-			// The caller contract for uploads: cancel the in-flight job, then commit.
 			const uploaded = {
 				imageUrl: "https://example.com/upload.png",
 				durationSec: 0,
@@ -558,8 +528,6 @@ describe("GenerationQueue", () => {
 				uploaded,
 			);
 
-			// The cancelled job resolves afterwards — it must not overwrite the
-			// committed result.
 			resolveGenerate({
 				url: "https://example.com/generated.png",
 				durationSec: 0,
@@ -581,9 +549,12 @@ describe("GenerationQueue", () => {
 			generationQueue.enqueue(makeJob("rr1", { inputs }));
 			await vi.runAllTimersAsync();
 
-			// Simulate the result drifting by setting an error first
-			generationQueue.setError("rr1", "stale");
-			expect(generationQueue.getElementSnapshot("rr1").result).toBeNull();
+			generationQueue.commitResult(
+				"rr1",
+				{ imageUrl: "https://example.com/other.png", durationSec: 0 },
+				{ prompt: "changed", attributes: {} },
+				{ connectorType: "image", uploaded: false },
+			);
 
 			const restored = generationQueue.restoreResult("rr1", inputs);
 			expect(restored).toBe(true);
@@ -609,7 +580,12 @@ describe("GenerationQueue", () => {
 				}),
 			);
 			await vi.runAllTimersAsync();
-			generationQueue.setError("rr2", "stale");
+			generationQueue.commitResult(
+				"rr2",
+				{ imageUrl: "https://example.com/other.png", durationSec: 0 },
+				{ prompt: "changed", attributes: {} },
+				{ connectorType: "image", uploaded: false },
+			);
 
 			// Look up with reversed key insertion order
 			const restored = generationQueue.restoreResult("rr2", {
@@ -620,25 +596,7 @@ describe("GenerationQueue", () => {
 			expect(generationQueue.getElementSnapshot("rr2").result).toEqual(result);
 		});
 
-		it("restores the uploaded flag with the result (upload stays uploaded)", () => {
-			const inputs = { prompt: "p", attributes: {} };
-			const upload = { imageUrl: "https://example.com/up.png", durationSec: 0 };
-			generationQueue.commitResult("rr3", upload, inputs, {
-				connectorType: "image",
-				uploaded: true,
-			});
-			generationQueue.setError("rr3", "drifted");
-
-			generationQueue.restoreResult("rr3", inputs);
-			const snap = generationQueue.getElementSnapshot("rr3");
-			expect(snap.result).toEqual(upload);
-			expect(snap.uploaded).toBe(true);
-		});
-
 		it("restores a generated result as not-uploaded even over a prior uploaded state", async () => {
-			// The laundering repro: upload at prompt A, generate at prompt B, then
-			// revert to A. Restoring A must bring back the upload AND its uploaded
-			// flag — not inherit uploaded:false from the intervening generation.
 			const inputsA = { prompt: "A", attributes: {} };
 			const inputsB = { prompt: "B", attributes: {} };
 			const upload = { imageUrl: "https://example.com/up.png", durationSec: 0 };
@@ -651,15 +609,11 @@ describe("GenerationQueue", () => {
 			generateMock.mockResolvedValue(generated);
 			generationQueue.enqueue(makeJob("rr4", { inputs: inputsB }));
 			await vi.runAllTimersAsync();
-			// Now at generated/B, uploaded reset to false.
 			expect(generationQueue.getElementSnapshot("rr4").uploaded).toBe(false);
 
-			// Restore B (generated): stays not-uploaded.
 			generationQueue.restoreResult("rr4", inputsB);
 			expect(generationQueue.getElementSnapshot("rr4").uploaded).toBe(false);
 
-			// Restore A (upload): uploaded travels back with it, so a later
-			// Generate All can't launder it into a regeneratable result.
 			generationQueue.restoreResult("rr4", inputsA);
 			const snap = generationQueue.getElementSnapshot("rr4");
 			expect(snap.result).toEqual(upload);
@@ -741,8 +695,10 @@ describe("GenerationQueue", () => {
 			expect(generationQueue.snapshot()).toEqual({ s1: idleEntry });
 		});
 
-		it("includes errored entries", () => {
-			generationQueue.setError("s2", "boom");
+		it("includes errored entries", async () => {
+			generateMock.mockRejectedValue(new Error("boom"));
+			generationQueue.enqueue(makeJob("s2"));
+			await vi.runAllTimersAsync();
 			expect(generationQueue.snapshot()).toEqual({
 				s2: {
 					status: "idle",
@@ -750,7 +706,7 @@ describe("GenerationQueue", () => {
 					result: null,
 					error: "boom",
 					resultInputs: null,
-					connectorType: null,
+					connectorType: "image",
 					uploaded: false,
 				},
 			});
@@ -777,8 +733,6 @@ describe("GenerationQueue", () => {
 		});
 
 		it("preserves the uploaded flag across rehydration (reload)", () => {
-			// A persisted upload must come back as uploaded:true, or the first
-			// Generate All after reload would clobber it.
 			const q = new GenerationQueue({
 				batchSize: 3,
 				initialState: { up: { ...idleEntry, uploaded: true } },
