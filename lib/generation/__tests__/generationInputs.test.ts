@@ -68,10 +68,6 @@ describe("isStaleResult", () => {
 	});
 
 	it("stays a pure inputs comparison — the uploaded flag does not suppress it", () => {
-		// isStaleResult answers only "do the inputs still match what produced
-		// this result". Skipping uploads is the caller's job (useGenerateAll), so
-		// the "prompt changed" staleness badge keeps telling the truth on an
-		// uploaded-then-edited element.
 		expect(
 			isStaleResult(
 				snapshot({

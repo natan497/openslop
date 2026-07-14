@@ -286,12 +286,6 @@ describe("useGenerateAll", () => {
 	});
 
 	it("excludes an uploaded image with a real prompt even when attributes drift", async () => {
-		// The motivating flow: image had a prompt, generated garbled text (#269),
-		// got an upload over it. Later something unrelated (aspect ratio, a
-		// tagged character's avatar) drifts the current attributes away from
-		// what was stored at upload time. Without the uploaded bit, isStaleResult
-		// would see the mismatch and Generate All would silently regenerate over
-		// the upload -- exactly what acceptance criterion #2 forbids.
 		getElementSnapshotSpy.mockImplementation((id: string) => ({
 			status: "idle",
 			seconds: 0,
