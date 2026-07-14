@@ -42,8 +42,6 @@ export type GenerationJob = {
 	element: CanvasContentElement;
 };
 
-// What commit provenance a result carries. A real job sets these on the way in;
-// an upload can't infer them, so the caller hands them over.
 export type ResultProvenance = {
 	connectorType: AssetConnectorType;
 	uploaded: boolean;
@@ -241,12 +239,6 @@ export class GenerationQueue {
 		if (hadEntry) this.processQueue();
 	}
 
-	setError(elementId: string, message: string) {
-		// uploaded describes the current result; clearing the result clears it.
-		this.update(elementId, { result: null, error: message, uploaded: false });
-		this.notify();
-	}
-
 	// Caller must cancel() any in-flight job first, or a late-resolving job can clobber this.
 	commitResult(
 		elementId: string,
@@ -278,8 +270,6 @@ export class GenerationQueue {
 			result: cached.result,
 			error: null,
 			resultInputs: inputs,
-			// Provenance travels with the result — restoring an upload keeps
-			// uploaded true; restoring a generated result resets it to false.
 			connectorType: cached.connectorType,
 			uploaded: cached.uploaded,
 		});
@@ -350,14 +340,12 @@ export class GenerationQueue {
 	) {
 		if (controller.signal.aborted) return;
 		console.error(`Generation failed for element ${elementId}:`, err);
+		// Keep the existing result: an upload can't be re-rolled, history isn't
+		// persisted, and restoreResult can't fire once result is nil.
 		this.update(elementId, {
 			status: "idle",
 			seconds: 0,
-			result: null,
 			error: errorMessage(err),
-			// A failed (re)generation leaves no result, so it's no longer an
-			// upload — otherwise Generate All would skip it forever.
-			uploaded: false,
 		});
 		this.notify();
 	}

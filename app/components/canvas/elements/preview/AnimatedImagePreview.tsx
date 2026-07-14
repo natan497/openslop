@@ -31,6 +31,7 @@ export function AnimatedImagePreview({
 					outputKind={mode === "animated" ? "video" : "image"}
 					status={status}
 					seconds={seconds}
+					error={error}
 				/>
 			) : (
 				<MediaPlaceholder

@@ -8,14 +8,16 @@ import {
 	AUDIO_BAR_COUNT,
 	buildSoundwaveMask,
 } from "@/lib/components/soundwave";
-import { PlaceholderOverlay, ResultOverlay } from "./overlays";
+import { ErrorMessage, PlaceholderOverlay, ResultOverlay } from "./overlays";
 
 export function AudioResult({
 	src,
 	status,
 	seconds,
+	error,
 }: GenerationState & {
 	src: string;
+	error?: string | null;
 }) {
 	return (
 		<div className="group relative w-full min-h-16 rounded-lg overflow-hidden border border-border bg-element-card flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-1.5">
@@ -27,6 +29,7 @@ export function AudioResult({
 				/>
 			)}
 			<AudioPlayer key={src} src={src} />
+			{error && <ErrorMessage message={error} />}
 		</div>
 	);
 }
@@ -77,9 +80,11 @@ export function MediaPreview({
 	outputKind,
 	status,
 	seconds,
+	error,
 }: GenerationState & {
 	url: string;
 	outputKind: "image" | "video";
+	error?: string | null;
 }) {
 	return (
 		<div className="group relative w-full aspect-video rounded-lg overflow-hidden border border-border">
@@ -90,7 +95,7 @@ export function MediaPreview({
 				videoInteractive
 				objectFit="contain"
 			/>
-			<ResultOverlay status={status} seconds={seconds} />
+			<ResultOverlay status={status} seconds={seconds} error={error} />
 		</div>
 	);
 }

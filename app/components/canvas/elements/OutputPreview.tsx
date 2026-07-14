@@ -23,7 +23,12 @@ function OutputPreviewComponent({
 	if (outputKind === "audio") {
 		if (result?.audioUrl) {
 			return (
-				<AudioResult src={result.audioUrl} status={status} seconds={seconds} />
+				<AudioResult
+					src={result.audioUrl}
+					status={status}
+					seconds={seconds}
+					error={error}
+				/>
 			);
 		}
 		return (
@@ -58,6 +63,7 @@ function OutputPreviewComponent({
 				outputKind={outputKind}
 				status={status}
 				seconds={seconds}
+				error={error}
 			/>
 		);
 	}

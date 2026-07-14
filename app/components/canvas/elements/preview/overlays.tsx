@@ -47,18 +47,26 @@ function CancelButton({
 	);
 }
 
-export function ResultOverlay({ status, seconds }: GenerationState) {
-	if (status === "idle") return null;
+export function ResultOverlay({
+	status,
+	seconds,
+	error,
+}: GenerationState & { error?: string | null }) {
 	return (
-		<GenerationIndicator
-			status={status}
-			seconds={seconds}
-			className="absolute top-2 left-2 z-10"
-		/>
+		<>
+			{error && <ErrorMessage message={error} />}
+			{status !== "idle" && (
+				<GenerationIndicator
+					status={status}
+					seconds={seconds}
+					className="absolute top-2 left-2 z-10"
+				/>
+			)}
+		</>
 	);
 }
 
-function ErrorMessage({ message }: { message: string }) {
+export function ErrorMessage({ message }: { message: string }) {
 	const [copied, setCopied] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(
