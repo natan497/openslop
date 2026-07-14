@@ -17,7 +17,7 @@ export function AudioResult({
 	error,
 }: GenerationState & {
 	src: string;
-	error?: string | null;
+	error: string | null;
 }) {
 	return (
 		<div className="group relative w-full min-h-16 rounded-lg overflow-hidden border border-border bg-element-card flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-1.5">
@@ -84,7 +84,7 @@ export function MediaPreview({
 }: GenerationState & {
 	url: string;
 	outputKind: "image" | "video";
-	error?: string | null;
+	error: string | null;
 }) {
 	return (
 		<div className="group relative w-full aspect-video rounded-lg overflow-hidden border border-border">

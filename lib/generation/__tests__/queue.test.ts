@@ -229,6 +229,22 @@ describe("GenerationQueue", () => {
 			expect(generationQueue.getElementSnapshot("err3").error).toBe("boom");
 		});
 
+		it("clears the previous error when a retry is enqueued", async () => {
+			generateMock.mockRejectedValue(new Error("boom"));
+			generationQueue.enqueue(makeJob("err5"));
+			await vi.runAllTimersAsync();
+			expect(generationQueue.getElementSnapshot("err5").error).toBe("boom");
+
+			generateMock.mockReturnValue(new Promise(() => {}));
+			generationQueue.enqueue(makeJob("err5"));
+
+			const snap = generationQueue.getElementSnapshot("err5");
+			expect(snap.status).toBe("generating");
+			expect(snap.error).toBeNull();
+
+			generationQueue.discard("err5");
+		});
+
 		it("keeps an uploaded result when a regenerate over it fails", async () => {
 			const inputs = { prompt: "p", attributes: {} };
 			const upload = { imageUrl: "https://example.com/up.png", durationSec: 0 };

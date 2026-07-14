@@ -42,7 +42,7 @@ export type GenerationJob = {
 	element: CanvasContentElement;
 };
 
-export type ResultProvenance = {
+type ResultProvenance = {
 	connectorType: AssetConnectorType;
 	uploaded: boolean;
 };
@@ -199,6 +199,8 @@ export class GenerationQueue {
 				status: "queued",
 				seconds: 0,
 				connectorType: job.connectorType,
+				// The previous attempt's error is stale the moment we retry.
+				error: null,
 			});
 			this.pending.push(job);
 			added = true;

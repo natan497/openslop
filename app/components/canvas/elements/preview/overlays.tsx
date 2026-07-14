@@ -51,7 +51,7 @@ export function ResultOverlay({
 	status,
 	seconds,
 	error,
-}: GenerationState & { error?: string | null }) {
+}: GenerationState & { error: string | null }) {
 	return (
 		<>
 			{error && <ErrorMessage message={error} />}
