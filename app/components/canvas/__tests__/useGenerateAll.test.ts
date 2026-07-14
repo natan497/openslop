@@ -139,6 +139,7 @@ describe("useGenerateAll", () => {
 				id === "a"
 					? { prompt: "sunset", attributes: { width: 2560, height: 1440 } }
 					: null,
+			connectorType: id === "a" ? "image" : null,
 		}));
 
 		const { useGenerateAll } = await import("../hooks/useGenerateAll");
@@ -168,6 +169,7 @@ describe("useGenerateAll", () => {
 			error: null,
 			resultInputs:
 				id === "a" ? { prompt: "old prompt", attributes: {} } : null,
+			connectorType: id === "a" ? "image" : null,
 		}));
 
 		const { useGenerateAll } = await import("../hooks/useGenerateAll");
@@ -199,6 +201,7 @@ describe("useGenerateAll", () => {
 				id === "a"
 					? { prompt: "hello", attributes: { emotion: "calm" } }
 					: null,
+			connectorType: id === "a" ? "tts" : null,
 		}));
 
 		const { useGenerateAll } = await import("../hooks/useGenerateAll");
@@ -229,12 +232,14 @@ describe("useGenerateAll", () => {
 				a: { prompt: "sunset", attributes: { width: 2560, height: 1440 } },
 				b: { prompt: "hello", attributes: {} },
 			};
+			const connectorType: Record<string, string> = { a: "image", b: "tts" };
 			return {
 				status: "idle",
 				seconds: 0,
 				result: { url: "https://example.com/asset.png" },
 				error: null,
 				resultInputs: inputs[id],
+				connectorType: connectorType[id],
 			};
 		});
 
@@ -256,9 +261,56 @@ describe("useGenerateAll", () => {
 		expect(jobs).toHaveLength(0);
 	});
 
+	// A generated (not uploaded) result left over from before a type change can
+	// coincidentally look non-stale under the new type's inputs -- only the
+	// connector mismatch reveals it belongs to a connector this element no
+	// longer uses.
+	it("regenerates a non-uploaded result left over from a type change", async () => {
+		getElementSnapshotSpy.mockImplementation((id: string) => ({
+			status: "idle",
+			seconds: 0,
+			result: id === "a" ? { imageUrl: "https://example.com/gen.png" } : null,
+			error: null,
+			// Matches the width/height/videoWidth/videoHeight the default 16:9
+			// aspect ratio injects for an animated_image element, so this result
+			// is NOT stale under isStaleResult -- only the connector mismatch
+			// (left over from before the type change) reveals it's unusable.
+			resultInputs:
+				id === "a"
+					? {
+							prompt: "wizard sign",
+							attributes: {
+								width: 2560,
+								height: 1440,
+								videoWidth: 1280,
+								videoHeight: 720,
+							},
+						}
+					: null,
+			uploaded: false,
+			connectorType: id === "a" ? "image" : null,
+		}));
+
+		const { useGenerateAll } = await import("../hooks/useGenerateAll");
+		const children: Descendant[] = [
+			wrapInScene([makeElement("a", "animated_image", "wizard sign")]),
+		];
+		const editor = { children } as unknown as Parameters<
+			typeof useGenerateAll
+		>[0];
+
+		const { generateAll } = useGenerateAll(editor);
+		generateAll();
+
+		const jobs: GenerationJob[] = enqueueAllSpy.mock.calls[0][0];
+		expect(jobs).toHaveLength(1);
+		expect(jobs[0].elementId).toBe("a");
+	});
+
 	// Animate rewrites the element's type in place, keeping its id, so the
-	// queue entry keeps an uploaded flag describing a still it can no longer use.
-	it("includes an animated image whose uploaded flag is left over from Animate", async () => {
+	// queue entry -- still stamped with the old connector -- is provenance for
+	// a connector this element no longer uses.
+	it("includes an animated image whose queue entry predates the Animate conversion", async () => {
 		getElementSnapshotSpy.mockImplementation((id: string) => ({
 			status: "idle",
 			seconds: 0,
@@ -268,6 +320,7 @@ describe("useGenerateAll", () => {
 			resultInputs:
 				id === "a" ? { prompt: "wizard sign", attributes: {} } : null,
 			uploaded: id === "a",
+			connectorType: id === "a" ? "image" : null,
 		}));
 
 		const { useGenerateAll } = await import("../hooks/useGenerateAll");
@@ -302,6 +355,7 @@ describe("useGenerateAll", () => {
 					? { prompt: "wizard sign", attributes: { emotion: "calm" } }
 					: null,
 			uploaded: id === "a",
+			connectorType: id === "a" ? "image" : null,
 		}));
 
 		const { useGenerateAll } = await import("../hooks/useGenerateAll");

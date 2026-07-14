@@ -72,6 +72,18 @@ function useCopyMessage(message: string) {
 	return { copied, copy };
 }
 
+function copyErrorLabel(message: string): string {
+	return `Generation failed: ${message}. Copy error message`;
+}
+
+function CopyStatus({ copied }: { copied: boolean }) {
+	return (
+		<span role="status" className="sr-only">
+			{copied ? "Copied" : ""}
+		</span>
+	);
+}
+
 // Compact, so a transient failure can't hide or swallow clicks on a result
 // that's still perfectly usable — unlike the placeholder, something is under it.
 // The message is truncated, so the trigger has to be focusable to reach it.
@@ -97,7 +109,7 @@ export function ErrorBadge({
 						<button
 							type="button"
 							onClick={copy}
-							aria-label={`Generation failed: ${message}. Copy error message`}
+							aria-label={copyErrorLabel(message)}
 						>
 							<AlertCircle />
 							<span className="min-w-0 truncate">{message}</span>
@@ -105,11 +117,7 @@ export function ErrorBadge({
 					</Badge>
 				</SimpleTooltip>
 			</span>
-			{/* Outside the alert: a polite confirmation, so the button keeps its
-			    name and copying doesn't re-announce the error assertively. */}
-			<span role="status" className="sr-only">
-				{copied ? "Copied" : ""}
-			</span>
+			<CopyStatus copied={copied} />
 		</>
 	);
 }
@@ -137,8 +145,7 @@ function ErrorMessage({ message }: { message: string }) {
 		<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-12 py-2">
 			<div className="pointer-events-auto flex max-h-full max-w-full items-start gap-1.5 overflow-auto rounded-md bg-destructive px-3 py-1.5 shadow-elevation-3">
 				<AlertCircle className="mt-px h-3.5 w-3.5 shrink-0 text-destructive-foreground" />
-				{/* The live region is the message, not the box: the box also holds the
-				    copy icon, whose swap would re-announce the whole error. */}
+				{/* Scoped to the message: the box also holds the copy icon, which swaps on copied. */}
 				<p
 					role="alert"
 					className="min-w-0 whitespace-pre-wrap break-words text-label leading-snug text-destructive-foreground"
@@ -148,7 +155,7 @@ function ErrorMessage({ message }: { message: string }) {
 				<button
 					type="button"
 					onClick={handleCopy}
-					aria-label={`Generation failed: ${message}. Copy error message`}
+					aria-label={copyErrorLabel(message)}
 					className="mt-px shrink-0 rounded-md text-destructive-foreground transition-colors focus-ring"
 				>
 					{copied ? (
@@ -157,9 +164,7 @@ function ErrorMessage({ message }: { message: string }) {
 						<Copy className="h-3.5 w-3.5" />
 					)}
 				</button>
-				<span role="status" className="sr-only">
-					{copied ? "Copied" : ""}
-				</span>
+				<CopyStatus copied={copied} />
 			</div>
 		</div>
 	);

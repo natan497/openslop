@@ -79,6 +79,18 @@ describe("errors stay visible when a result is present", () => {
 		expect(alertClass(html)).not.toContain("inset-0");
 	});
 
+	it("AudioResult error can shrink, so a long message truncates", () => {
+		const html = render(
+			<AudioResult
+				src="https://example.com/a.mp3"
+				status="idle"
+				seconds={0}
+				error="the provider rejected this request for a reason it described at considerable length"
+			/>,
+		);
+		expect(alertClass(html)).toContain("min-w-0");
+	});
+
 	// Static markup can't drive `copied`, so this pins the resting contract only:
 	// the trigger is named after the error, and a polite region exists to carry
 	// the confirmation instead of the name.
@@ -109,7 +121,9 @@ describe("errors stay visible when a result is present", () => {
 
 	// The placeholder is the more common failure: an element that never generated
 	// has no result, so a provider blowup lands here rather than on the badge.
-	it("MediaPlaceholder announces the error and names its copy button", () => {
+	// Naming is covered by the it.each above; this covers the message itself
+	// being inside the live region.
+	it("MediaPlaceholder announces the error in the live region", () => {
 		const html = render(
 			<MediaPlaceholder
 				status="idle"
@@ -118,8 +132,6 @@ describe("errors stay visible when a result is present", () => {
 				onDiscard={() => {}}
 			/>,
 		);
-		expect(alertClass(html)).toBeDefined();
 		expect(html).toMatch(/role="alert"[^>]*>provider exploded/);
-		expect(html).toMatch(/<button[^>]*aria-label="Generation failed: provider/);
 	});
 });
