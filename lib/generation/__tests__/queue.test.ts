@@ -230,6 +230,23 @@ describe("GenerationQueue", () => {
 			expect(listener).toHaveBeenCalled();
 			expect(generationQueue.getElementSnapshot("err3").error).toBe("boom");
 		});
+
+		it("clears the uploaded flag when a regenerate over an upload fails", async () => {
+			const inputs = { prompt: "p", attributes: {} };
+			generationQueue.commitResult(
+				"err4",
+				{ imageUrl: "https://example.com/up.png", durationSec: 0 },
+				inputs,
+				{ connectorType: "image", uploaded: true },
+			);
+			generateMock.mockRejectedValue(new Error("gen failed"));
+			generationQueue.enqueue(makeJob("err4", { inputs }));
+			await vi.runAllTimersAsync();
+
+			const snap = generationQueue.getElementSnapshot("err4");
+			expect(snap.result).toBeNull();
+			expect(snap.uploaded).toBe(false);
+		});
 	});
 
 	describe("cancel", () => {
@@ -361,6 +378,24 @@ describe("GenerationQueue", () => {
 
 			generationQueue.discard("se1");
 		});
+
+		it("clears the uploaded flag when it nulls the result", () => {
+			// Upload, then a failed regenerate lands here — leaving uploaded true
+			// with no result would make Generate All skip the element forever.
+			generationQueue.commitResult(
+				"se2",
+				{ imageUrl: "https://example.com/up.png", durationSec: 0 },
+				{ prompt: "p", attributes: {} },
+				{ connectorType: "image", uploaded: true },
+			);
+			generationQueue.setError("se2", "regenerate failed");
+
+			const snap = generationQueue.getElementSnapshot("se2");
+			expect(snap.result).toBeNull();
+			expect(snap.uploaded).toBe(false);
+
+			generationQueue.discard("se2");
+		});
 	});
 
 	describe("commitResult", () => {
@@ -370,7 +405,10 @@ describe("GenerationQueue", () => {
 				durationSec: 0,
 			};
 			const inputs = { prompt: "p", attributes: {} };
-			generationQueue.commitResult("sm1", result, inputs, "image", true);
+			generationQueue.commitResult("sm1", result, inputs, {
+				connectorType: "image",
+				uploaded: true,
+			});
 
 			const snap = generationQueue.getElementSnapshot("sm1");
 			expect(snap.status).toBe("idle");
@@ -392,8 +430,7 @@ describe("GenerationQueue", () => {
 				"scene-1",
 				{ imageUrl: "https://example.com/upload.png", durationSec: 0 },
 				{ prompt: "", attributes: {} },
-				"image",
-				true,
+				{ connectorType: "image", uploaded: true },
 			);
 
 			const thumbnail = pickThumbnailUrl(
@@ -421,7 +458,10 @@ describe("GenerationQueue", () => {
 				imageUrl: "https://example.com/upload.png",
 				durationSec: 0,
 			};
-			generationQueue.commitResult("sm2", uploaded, inputs, "image", true);
+			generationQueue.commitResult("sm2", uploaded, inputs, {
+				connectorType: "image",
+				uploaded: true,
+			});
 			expect(generationQueue.getElementSnapshot("sm2").result).toEqual(
 				uploaded,
 			);
@@ -446,8 +486,7 @@ describe("GenerationQueue", () => {
 					prompt: "p",
 					attributes: {},
 				},
-				"image",
-				true,
+				{ connectorType: "image", uploaded: true },
 			);
 			const snap = generationQueue.getElementSnapshot("sm3");
 			expect(snap.error).toBeNull();
@@ -462,7 +501,10 @@ describe("GenerationQueue", () => {
 				durationSec: 0,
 			};
 			const inputs = { prompt: "p", attributes: {} };
-			generationQueue.commitResult("sm4", uploaded, inputs, "image", true);
+			generationQueue.commitResult("sm4", uploaded, inputs, {
+				connectorType: "image",
+				uploaded: true,
+			});
 			generationQueue.setError("sm4", "prompt changed");
 			expect(generationQueue.getElementSnapshot("sm4").result).toBeNull();
 
@@ -482,8 +524,7 @@ describe("GenerationQueue", () => {
 				"sm5",
 				{ imageUrl: "https://example.com/upload.png", durationSec: 0 },
 				{ prompt: "p", attributes: {} },
-				"image",
-				true,
+				{ connectorType: "image", uploaded: true },
 			);
 			expect(listener).toHaveBeenCalled();
 
@@ -509,7 +550,10 @@ describe("GenerationQueue", () => {
 				durationSec: 0,
 			};
 			generationQueue.cancel("sm6");
-			generationQueue.commitResult("sm6", uploaded, inputs, "image", true);
+			generationQueue.commitResult("sm6", uploaded, inputs, {
+				connectorType: "image",
+				uploaded: true,
+			});
 			expect(generationQueue.getElementSnapshot("sm6").result).toEqual(
 				uploaded,
 			);
@@ -574,6 +618,52 @@ describe("GenerationQueue", () => {
 			});
 			expect(restored).toBe(true);
 			expect(generationQueue.getElementSnapshot("rr2").result).toEqual(result);
+		});
+
+		it("restores the uploaded flag with the result (upload stays uploaded)", () => {
+			const inputs = { prompt: "p", attributes: {} };
+			const upload = { imageUrl: "https://example.com/up.png", durationSec: 0 };
+			generationQueue.commitResult("rr3", upload, inputs, {
+				connectorType: "image",
+				uploaded: true,
+			});
+			generationQueue.setError("rr3", "drifted");
+
+			generationQueue.restoreResult("rr3", inputs);
+			const snap = generationQueue.getElementSnapshot("rr3");
+			expect(snap.result).toEqual(upload);
+			expect(snap.uploaded).toBe(true);
+		});
+
+		it("restores a generated result as not-uploaded even over a prior uploaded state", async () => {
+			// The laundering repro: upload at prompt A, generate at prompt B, then
+			// revert to A. Restoring A must bring back the upload AND its uploaded
+			// flag — not inherit uploaded:false from the intervening generation.
+			const inputsA = { prompt: "A", attributes: {} };
+			const inputsB = { prompt: "B", attributes: {} };
+			const upload = { imageUrl: "https://example.com/up.png", durationSec: 0 };
+			const generated = { url: "https://example.com/gen.png", durationSec: 0 };
+
+			generationQueue.commitResult("rr4", upload, inputsA, {
+				connectorType: "image",
+				uploaded: true,
+			});
+			generateMock.mockResolvedValue(generated);
+			generationQueue.enqueue(makeJob("rr4", { inputs: inputsB }));
+			await vi.runAllTimersAsync();
+			// Now at generated/B, uploaded reset to false.
+			expect(generationQueue.getElementSnapshot("rr4").uploaded).toBe(false);
+
+			// Restore B (generated): stays not-uploaded.
+			generationQueue.restoreResult("rr4", inputsB);
+			expect(generationQueue.getElementSnapshot("rr4").uploaded).toBe(false);
+
+			// Restore A (upload): uploaded travels back with it, so a later
+			// Generate All can't launder it into a regeneratable result.
+			generationQueue.restoreResult("rr4", inputsA);
+			const snap = generationQueue.getElementSnapshot("rr4");
+			expect(snap.result).toEqual(upload);
+			expect(snap.uploaded).toBe(true);
 		});
 	});
 
@@ -684,6 +774,16 @@ describe("GenerationQueue", () => {
 				initialState: { h1: idleEntry },
 			});
 			expect(q.getElementSnapshot("h1")).toEqual(idleEntry);
+		});
+
+		it("preserves the uploaded flag across rehydration (reload)", () => {
+			// A persisted upload must come back as uploaded:true, or the first
+			// Generate All after reload would clobber it.
+			const q = new GenerationQueue({
+				batchSize: 3,
+				initialState: { up: { ...idleEntry, uploaded: true } },
+			});
+			expect(q.getElementSnapshot("up").uploaded).toBe(true);
 		});
 
 		it("normalizes stale 'generating' status back to idle", () => {

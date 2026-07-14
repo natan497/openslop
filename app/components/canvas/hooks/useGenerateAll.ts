@@ -19,8 +19,12 @@ export function useGenerateAll(editor: Editor) {
 			.filter((el) => {
 				const inputs = getGenerationInputs(el, metadata);
 				const snap = queue.getElementSnapshot(el.id);
+				// Never regenerate over a user's upload — its inputs don't describe
+				// it, so isStaleResult would call it stale on unrelated drift.
 				const shouldGenerate =
-					inputs.prompt && (!snap.result || isStaleResult(snap, inputs));
+					inputs.prompt &&
+					!snap.uploaded &&
+					(!snap.result || isStaleResult(snap, inputs));
 				return shouldGenerate;
 			})
 			.map((el) => buildGenerationJob(el, connectorConfig, projectId));

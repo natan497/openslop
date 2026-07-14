@@ -30,10 +30,6 @@ export function isStaleResult(
 	currentInputs: GenerationInputs,
 ): boolean {
 	if (isNil(snapshot.result)) return false;
-	// An uploaded result isn't a stand-in for some prompt/attributes combo, so
-	// unrelated input drift (aspect ratio, a tagged character's avatar) must
-	// not make it eligible for Generate All to silently replace.
-	if (snapshot.uploaded) return false;
 	return !isEqual(currentInputs, snapshot.resultInputs);
 }
 
@@ -45,6 +41,18 @@ export type GenerationJob = {
 	projectId: string;
 	element: CanvasContentElement;
 };
+
+// What commit provenance a result carries. A real job sets these on the way in;
+// an upload can't infer them, so the caller hands them over.
+export type ResultProvenance = {
+	connectorType: AssetConnectorType;
+	uploaded: boolean;
+};
+
+// history caches the result AND its provenance, so restoreResult can put both
+// back — the uploaded bit must travel with the result it describes, not desync
+// from it across a revert.
+type HistoryEntry = ResultProvenance & { result: AssetResult };
 
 const EMPTY_SNAPSHOT: ElementSnapshot = {
 	status: "idle",
@@ -66,7 +74,7 @@ export class GenerationQueue {
 	private jobStarts = new Map<string, number>();
 	private tickTimer: ReturnType<typeof setInterval> | null = null;
 	private listeners = new Set<() => void>();
-	private history = new Map<string, Map<string, AssetResult>>();
+	private history = new Map<string, Map<string, HistoryEntry>>();
 	private readonly batchSize: number;
 	private _resultVersion = 0;
 	private _peakActive = 0;
@@ -234,22 +242,22 @@ export class GenerationQueue {
 	}
 
 	setError(elementId: string, message: string) {
-		this.update(elementId, { result: null, error: message });
+		// uploaded describes the current result; clearing the result clears it.
+		this.update(elementId, { result: null, error: message, uploaded: false });
 		this.notify();
 	}
 
-	// Cancel() any in-flight job first (or it can clobber this), and pass connectorType and uploaded.
+	// Caller must cancel() any in-flight job first, or a late-resolving job can clobber this.
 	commitResult(
 		elementId: string,
 		result: AssetResult,
 		inputs: GenerationInputs,
-		connectorType: AssetConnectorType,
-		uploaded: boolean,
+		provenance: ResultProvenance,
 	): void {
 		const key = serializeInputs(inputs);
 		const elHistory =
-			this.history.get(elementId) ?? new Map<string, AssetResult>();
-		elHistory.set(key, result);
+			this.history.get(elementId) ?? new Map<string, HistoryEntry>();
+		elHistory.set(key, { result, ...provenance });
 		this.history.set(elementId, elHistory);
 		this.update(elementId, {
 			status: "idle",
@@ -257,8 +265,7 @@ export class GenerationQueue {
 			result,
 			error: null,
 			resultInputs: inputs,
-			connectorType,
-			uploaded,
+			...provenance,
 		});
 		this.notify();
 	}
@@ -268,9 +275,13 @@ export class GenerationQueue {
 		const cached = this.history.get(elementId)?.get(key);
 		if (!cached) return false;
 		this.update(elementId, {
-			result: cached,
+			result: cached.result,
 			error: null,
 			resultInputs: inputs,
+			// Provenance travels with the result — restoring an upload keeps
+			// uploaded true; restoring a generated result resets it to false.
+			connectorType: cached.connectorType,
+			uploaded: cached.uploaded,
 		});
 		this.notify();
 		return true;
@@ -326,7 +337,10 @@ export class GenerationQueue {
 		controller: AbortController,
 	) {
 		if (controller.signal.aborted) return;
-		this.commitResult(job.elementId, result, inputs, job.connectorType, false);
+		this.commitResult(job.elementId, result, inputs, {
+			connectorType: job.connectorType,
+			uploaded: false,
+		});
 	}
 
 	private handleJobError(
@@ -341,6 +355,9 @@ export class GenerationQueue {
 			seconds: 0,
 			result: null,
 			error: errorMessage(err),
+			// A failed (re)generation leaves no result, so it's no longer an
+			// upload — otherwise Generate All would skip it forever.
+			uploaded: false,
 		});
 		this.notify();
 	}

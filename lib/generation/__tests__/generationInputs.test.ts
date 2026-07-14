@@ -67,10 +67,11 @@ describe("isStaleResult", () => {
 		).toBe(true);
 	});
 
-	it("is false for an uploaded result even when attributes differ", () => {
-		// An uploaded image isn't a stand-in for any particular prompt/attributes
-		// combo, so unrelated drift (aspect ratio, a character's avatar) must not
-		// make Generate All eligible to replace it.
+	it("stays a pure inputs comparison — the uploaded flag does not suppress it", () => {
+		// isStaleResult answers only "do the inputs still match what produced
+		// this result". Skipping uploads is the caller's job (useGenerateAll), so
+		// the "prompt changed" staleness badge keeps telling the truth on an
+		// uploaded-then-edited element.
 		expect(
 			isStaleResult(
 				snapshot({
@@ -80,7 +81,7 @@ describe("isStaleResult", () => {
 				}),
 				inputs("hi", { gender: "feminine" }),
 			),
-		).toBe(false);
+		).toBe(true);
 	});
 
 	it("treats attribute key sets as equal regardless of insertion order", () => {
