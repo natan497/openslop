@@ -748,6 +748,16 @@ describe("GenerationQueue", () => {
 			expect(q.getElementSnapshot("h1")).toEqual(idleEntry);
 		});
 
+		it("drops a persisted error on rehydration", () => {
+			const q = new GenerationQueue({
+				batchSize: 3,
+				initialState: { e1: { ...idleEntry, error: "last session blew up" } },
+			});
+			const snap = q.getElementSnapshot("e1");
+			expect(snap.error).toBeNull();
+			expect(snap.result).toEqual(idleEntry.result);
+		});
+
 		it("preserves the uploaded flag across rehydration (reload)", () => {
 			const q = new GenerationQueue({
 				batchSize: 3,

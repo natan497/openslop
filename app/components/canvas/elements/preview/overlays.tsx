@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X as XIcon, AlertCircle, Check, Copy } from "@/components/ui/icon";
 import { SimpleTooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { GenerationIndicator } from "../GenerationIndicator";
 import type { GenerationState, PlaceholderProps } from "./status";
 
@@ -47,14 +48,37 @@ function CancelButton({
 	);
 }
 
-export function ResultOverlay({
-	status,
-	seconds,
-	error,
-}: GenerationState & { error: string | null }) {
+// Compact, so a transient failure can't hide or swallow clicks on a result
+// that's still perfectly usable — unlike the placeholder, something is under it.
+export function ErrorBadge({
+	message,
+	className,
+}: {
+	message: string;
+	className: string;
+}) {
+	return (
+		<SimpleTooltip label={message}>
+			<span
+				role="status"
+				className={cn(
+					"flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-md bg-destructive px-1.5 py-1 text-label text-destructive-foreground shadow-sm",
+					className,
+				)}
+			>
+				<AlertCircle className="h-3 w-3 shrink-0" />
+				<span className="truncate">{message}</span>
+			</span>
+		</SimpleTooltip>
+	);
+}
+
+export function ResultOverlay({ status, seconds, error }: GenerationState) {
 	return (
 		<>
-			{error && <ErrorMessage message={error} />}
+			{error && (
+				<ErrorBadge message={error} className="absolute top-2 left-2 z-10" />
+			)}
 			{status !== "idle" && (
 				<GenerationIndicator
 					status={status}
@@ -66,7 +90,7 @@ export function ResultOverlay({
 	);
 }
 
-export function ErrorMessage({ message }: { message: string }) {
+function ErrorMessage({ message }: { message: string }) {
 	const [copied, setCopied] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(

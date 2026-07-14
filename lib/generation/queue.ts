@@ -86,7 +86,9 @@ export class GenerationQueue {
 	}) {
 		this.batchSize = batchSize;
 		for (const [id, snap] of Object.entries(initialState)) {
-			this.state.set(id, { ...snap, status: "idle", seconds: 0 });
+			// error is transient job state like status/seconds — a failure from a
+			// past session shouldn't come back sitting on top of a good result.
+			this.state.set(id, { ...snap, status: "idle", seconds: 0, error: null });
 		}
 	}
 
