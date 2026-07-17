@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import isNil from "lodash/isNil";
 import { Editor } from "slate";
 import { useConfig } from "@/lib/config/ConfigProvider";
 import { ELEMENT_CONFIGS } from "@/lib/canvas/elementConfigs";
@@ -23,12 +24,14 @@ export function useGenerateAll(editor: Editor) {
 				// A type change (e.g. Animate) rewrites the element in place and
 				// keeps its id, so the queue entry can be provenance for a connector
 				// this element no longer uses -- that invalidates all of it, not just
-				// the uploaded flag.
-				const producedForCurrentType =
-					snap.connectorType === ELEMENT_CONFIGS[el.type].connector;
+				// the uploaded flag. Rows persisted before connectorType existed have
+				// no key for it at all, so absence must not be treated as a mismatch.
+				const foreignConnector =
+					!isNil(snap.connectorType) &&
+					snap.connectorType !== ELEMENT_CONFIGS[el.type].connector;
 				const shouldGenerate =
 					inputs.prompt &&
-					(!producedForCurrentType ||
+					(foreignConnector ||
 						(!snap.uploaded && (!snap.result || isStaleResult(snap, inputs))));
 				return shouldGenerate;
 			})

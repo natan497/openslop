@@ -307,6 +307,39 @@ describe("useGenerateAll", () => {
 		expect(jobs[0].elementId).toBe("a");
 	});
 
+	// Rows persisted before connectorType was introduced have no key for it at
+	// all (not null) -- that absence must not be read as a mismatch, or every
+	// project generated before #393 regenerates in full on its next Generate All.
+	it("does not regenerate a legacy result with no persisted connectorType", async () => {
+		getElementSnapshotSpy.mockImplementation((id: string) => ({
+			status: "idle",
+			seconds: 0,
+			result: id === "a" ? { imageUrl: "https://example.com/gen.png" } : null,
+			error: null,
+			resultInputs:
+				id === "a"
+					? {
+							prompt: "wizard sign",
+							attributes: { width: 2560, height: 1440 },
+						}
+					: null,
+		}));
+
+		const { useGenerateAll } = await import("../hooks/useGenerateAll");
+		const children: Descendant[] = [
+			wrapInScene([makeElement("a", "image", "wizard sign")]),
+		];
+		const editor = { children } as unknown as Parameters<
+			typeof useGenerateAll
+		>[0];
+
+		const { generateAll } = useGenerateAll(editor);
+		generateAll();
+
+		const jobs: GenerationJob[] = enqueueAllSpy.mock.calls[0][0];
+		expect(jobs).toHaveLength(0);
+	});
+
 	// Animate rewrites the element's type in place, keeping its id, so the
 	// queue entry -- still stamped with the old connector -- is provenance for
 	// a connector this element no longer uses.
